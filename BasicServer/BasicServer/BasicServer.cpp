@@ -30,7 +30,7 @@ int __cdecl main(void)
 	struct addrinfo *result = NULL;
 	struct addrinfo hints;
 
-	char recvbuf[DEFAULT_BUFLEN];
+	wchar_t recvbuf[DEFAULT_BUFLEN];
 	int recvbuflen = DEFAULT_BUFLEN;
 
 	// Initialize Winsock
@@ -100,11 +100,12 @@ int __cdecl main(void)
 		// Receive until the peer closes the connection
 		printf("/Ricevuto\\ \n");
 		do {
-			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+			iResult = recv(ClientSocket, (char *)recvbuf, recvbuflen, 0);
+
 			if (iResult > 0) {
-				recvbuf[iResult] = '\0';
-				printf("\t%s\n", recvbuf);
-				if (iResult >= 3 && !strcmp(&recvbuf[iResult-3], "end")) {
+				recvbuf[iResult/2] = L'\0'; //iResult is number of bytes recived, one wchar_t character is 2 byte wide.
+				printf("\t%ls\n", recvbuf);
+				if (iResult/2 >= 3 && !wcscmp(&recvbuf[iResult/2-3], L"end")) {
 					break;
 				}
 			}
@@ -115,9 +116,9 @@ int __cdecl main(void)
 
 		} while (iResult > 0);
 		printf("\\Ricevuto/ \n\n/Inviato\\ \n\t");
-		gets_s(recvbuf, sizeof(recvbuf)-1);
+		_getws_s(recvbuf, sizeof(recvbuf)/2); //Remember wchar_t is 2 bytes
 		// Send an initial buffer
-		iResult = send(ClientSocket, recvbuf, strlen(recvbuf), 0);
+		iResult = send(ClientSocket, (char *)recvbuf, wcslen(recvbuf)*2, 0);
 		//Send failed
 		if (iResult == SOCKET_ERROR) {
 			printf("send failed with error: %d\n", WSAGetLastError());
