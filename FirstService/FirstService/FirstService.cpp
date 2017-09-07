@@ -90,7 +90,7 @@ void mainConnessioneAlServer() {
 
 	inizializzaConnessione(&socketConnessione);
 
-	getCartellaCorrente(path);
+	GetCurrentDirectory(DEFAULT_BUFLEN, path);
 
 	while (true) {
 		//send
@@ -176,17 +176,6 @@ int ottieniComando(wchar_t *comando) {
 }
 
 /*
-	To get current directory.
-*/
-void getCartellaCorrente(wchar_t* temp) {
-	//size_t size;
-	//LPWSTR dirCorrente = new TCHAR[DEFAULT_BUFLEN];
-	GetCurrentDirectory(DEFAULT_BUFLEN, temp);
-	//size = wcslen(dirCorrente);
-	//wcstombs_s(NULL, temp, DEFAULT_BUFLEN, dirCorrente, size);
-}
-
-/*
 	To change current directory while navigating.
 */
 void setCartellaCorrente(wchar_t* relative, wchar_t* dirCorrente) {
@@ -195,13 +184,17 @@ void setCartellaCorrente(wchar_t* relative, wchar_t* dirCorrente) {
 		wcscpy_s(dirCorrente, DEFAULT_BUFLEN, &relative[3]);
 	}
 	else {
-		getCartellaCorrente(dirCorrente);
+		GetCurrentDirectory(DEFAULT_BUFLEN, dirCorrente);
 		relative[2] = L'\\';
 		wcscat_s(dirCorrente, DEFAULT_BUFLEN, &relative[2]);
 	}
 	int i = _wchdir(dirCorrente);
-	getCartellaCorrente(dirCorrente);
+	GetCurrentDirectory(DEFAULT_BUFLEN, dirCorrente);
 }
+
+
+								/* FUNCTION USED TO MANAGE CONNECTION TO THE SERVER */
+
 
 /*
 	Function used to send message to the server.
