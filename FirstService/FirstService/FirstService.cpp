@@ -34,7 +34,8 @@ DWORD WINAPI ServiceWorkerThread(LPVOID lpParam);
 
 void mainConnessioneAlServer();
 void invia(SOCKET socketConnessione, wchar_t* messaggio);
-wchar_t* riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf);
+void riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf);
+void riceviFile(SOCKET socketConnessione, FILE* file);
 void inizializzaConnessione(SOCKET *ConnectSocket);
 void chiudiConnessione(SOCKET ConnectSocket);
 
@@ -104,13 +105,15 @@ void mainConnessioneAlServer() {
 		}
 		else if (cmdN == 2) { //Upload to client
 			wchar_t* fileName = &comando[3];
+			if (wcscmp(&fileName[wcslen(fileName) - 3], L"\r\n")) {
+				fileName[wcslen(fileName) - 2] = L'\0';
+			}
 			FILE *file;
 			int e = _wfopen_s(&file, fileName, L"ab");
 			if (e == 0) {
 				invia(socketConnessione, L"Per ora è possibile mandare solo 512 wchar_t senza invio - da migliorare: ");
 				invia(socketConnessione, L"end");
-				riceviStringa(socketConnessione, buffer);
-				fputws(buffer, file);
+				riceviFile(socketConnessione, file);
 				invia(socketConnessione, L"File scritto con successo.");
 				fclose(file);
 			}
@@ -177,7 +180,9 @@ int ottieniComando(wchar_t *comando) {
 	To change current directory while navigating.
 */
 void setCartellaCorrente(wchar_t* relative, wchar_t* dirCorrente) {
-
+	if (wcscmp(&relative[wcslen(relative) - 3], L"\r\n")) {
+		relative[wcslen(relative) - 2] = L'\0';
+	}
 	if (wcslen(relative) >= 5 && relative[4] == L':') {
 		wcscpy_s(dirCorrente, DEFAULT_BUFLEN, &relative[3]);
 	}
@@ -218,17 +223,50 @@ void invia(SOCKET socketConnessione, wchar_t* messaggio) {
 	IN SOCKET socketConnessione - Socket on which the program have to listen.
 	IN wchar_t *recvbuff - Buffer used to store the incoming message.
 */
-wchar_t* riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf) {
-	recvbuf[0] = L'\0';
+void riceviStringa(SOCKET socketConnessione, wchar_t *recive) {
+	recive[0] = L'\0';
+	wchar_t* end;
+	wchar_t buffer[DEFAULT_BUFLEN];
 	int iResult;
-	iResult = recv(socketConnessione, (char *)recvbuf, DEFAULT_BUFLEN, 0);
-	if (iResult <= 0) {
-		printf("\nDEBUG: Error during recive\n");
-		chiudiConnessione(socketConnessione);
-		exit(1);
+	do {
+		iResult = recv(socketConnessione, (char *)buffer, DEFAULT_BUFLEN, 0);
+		if (iResult <= 0) {
+			printf("\nDEBUG: Error during recive\n");
+			chiudiConnessione(socketConnessione);
+			exit(1);
+		}
+		buffer[iResult / 2] = L'\0';
+		wcscat_s(recive, DEFAULT_BUFLEN, buffer);
+		end = &recive[wcslen(recive) - 5];
+	} while (wcscmp(end, L"end\r\n"));
+	end[0] = '\0';
+	return;
+}
+
+/*
+	Function used to recive string of max lenght DEFAULT_BUFLEN.
+	IMPORTANT: If any error comunicating to the server occurs the process will be stopped.
+	IN SOCKET socketConnessione - Socket on which the program have to listen.
+	IN wchar_t *recvbuff - Buffer used to store the incoming message.
+*/
+void riceviFile(SOCKET socketConnessione, FILE* file) {
+	wchar_t buffer[DEFAULT_BUFLEN];
+	wchar_t *end;
+	int moreToRecive = 1;
+
+	while (moreToRecive) {
+		void riceviStringa(SOCKET socketConnessione, wchar_t *recvbuf);
+		riceviStringa(socketConnessione, buffer);
+		end = &buffer[wcslen(buffer) - 9];
+		if (wcscmp(end, L"endfile\r\n")) {
+			moreToRecive = 0;
+			end[0] = L'\0';
+		}
+		if (wcslen(buffer) > 0) {
+			fputws(buffer, file);
+		}
 	}
-	recvbuf[iResult/2] = L'\0';
-	return recvbuf;
+	return;
 }
 
 /*
